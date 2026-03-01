@@ -1,4 +1,4 @@
-import { encoder } from './unicode';
+import { decoder, encoder } from './unicode';
 import { InputType, InputTypes, isTypedArray } from './inputTypes';
 
 // createParserState :: x -> s -> ParserState e a s
@@ -86,11 +86,54 @@ export type Ok<T, D> = {
   data: D;
 };
 
+let log = (...args: any) => {
+  process.stdout.write(`${args}\n`);
+};
+
+let id_fn = () => {
+  let id = 1;
+  return () => {
+    return id++;
+  };
+};
+
+let memo = (key_fn: any, fn: any) => {
+  let cache: Map<string, number> = new Map();
+  return (...args: any): any => {
+    let key = key_fn(...args);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    let val = fn(...args);
+    cache.set(key, val);
+    return val;
+  };
+};
+
+let decode_val = (x: BufferSource): string => decoder.decode(x);
+
+const replacer = () => {
+  const memo_decode = memo(decode_val, id_fn());
+  return (key: string, value: any): any => {
+    if (key === "dataView") {
+      return memo_decode(value);
+    }
+    return value;
+  };
+};
+
+let state_key_fn = () => {
+  let replacer_fn = replacer();
+  return (...args: any): any => {
+    return JSON.stringify(args, replacer_fn)
+  };
+};
+
 export class Parser<T, E = string, D = any> {
   p: StateTransformerFunction<T, E, D>;
 
   constructor(p: StateTransformerFunction<T, E, D>) {
-    this.p = p;
+    this.p = memo(state_key_fn(), p);
   }
 
   // run :: Parser e a s ~> x -> Either e a

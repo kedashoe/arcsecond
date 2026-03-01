@@ -535,6 +535,13 @@ testMany('everyCharUntil', [
   expectedFailTest(everyCharUntil(char('!')), ''),
 ]);
 
+test('cache', () => {
+  process.stdout.write(`>>>>>>> HERE\n`);
+  const parser = char('a');
+  expectedSuccessTest(parser, "a", "a")();
+  expectedSuccessTest(parser, "a", "a")();
+});
+
 test('errorMapTo', () => {
   const parser = pipeParsers([
     choice([
@@ -1192,9 +1199,12 @@ testMany('ap (laws)', [
 
 test('coroutine is stack safe', () => {
   const doubleStack = MAX_STACK_SIZE * 2;
+  //const doubleStack = 10000;
   const input = 'a'.repeat(doubleStack);
 
+  process.stdout.write(`coroutine outside ${doubleStack}\n`);
   const parser = coroutine(run => {
+    process.stdout.write(`coroutine run ${doubleStack}\n`);
     let out = '';
     for (let i = 0; i < doubleStack; i++) {
       out += run(letter).toUpperCase();
