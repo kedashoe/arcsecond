@@ -86,10 +86,6 @@ export type Ok<T, D> = {
   data: D;
 };
 
-let log = (...args: any) => {
-  process.stdout.write(`${args}\n`);
-};
-
 let id_fn = () => {
   let id = 1;
   return () => {
@@ -97,24 +93,60 @@ let id_fn = () => {
   };
 };
 
-let memo = (key_fn: any, fn: any) => {
-  let cache: Map<string, number> = new Map();
-  return (...args: any): any => {
-    let key = key_fn(...args);
-    if (cache.has(key)) {
-      return cache.get(key);
+const MAX_CACHE_SIZE = 128;
+const NOT_FOUND: Object = {};
+
+class RandomEvictionCache<A> {
+  public cache: Map<string, any>;
+  public pointers: Array<string>;
+
+  public constructor() {
+    this.cache = new Map();
+    this.pointers = [];
+  }
+
+  public get(key: string): A | typeof NOT_FOUND {
+    return this.cache.has(key) ? this.cache.get(key) : NOT_FOUND;
+  }
+
+  private maybe_evict() {
+    if (this.pointers.length === MAX_CACHE_SIZE) {
+      const key = this.pointers.splice(Math.floor(Math.random() * MAX_CACHE_SIZE), 1)[0];
+      this.cache.delete(key);
     }
-    let val = fn(...args);
+  }
+
+  public set(key: string, val: A) {
+    this.maybe_evict();
+    this.cache.set(key, val);
+    this.pointers.push(key);
+  }
+}
+
+let memo = (key_fn: any, fn: any) => {
+  let cache: RandomEvictionCache<any> = new RandomEvictionCache();
+  return (...args: any): any => {
+    const key = key_fn(...args);
+    const maybe_val = cache.get(key);
+    if (maybe_val !== NOT_FOUND) {
+      return maybe_val;
+    }
+    const val = fn(...args);
     cache.set(key, val);
     return val;
   };
 };
 
-let decode_val = (x: BufferSource): string => decoder.decode(x);
-
 const replacer = () => {
-  const memo_decode = memo(decode_val, id_fn());
-  return (key: string, value: any): any => {
+  /*
+   * If we are parsing large inputs, we end up with huge cache keys. But we
+   * don't actually care about the keys themselves, we just need to know if
+   * our value is something we have in the cache. So rather than including
+   * the input in our key, we memoize that as well and store a simple
+   * incrementing id.
+   */
+  const memo_decode = memo(decoder.decode.bind(decoder), id_fn());
+  return (key: string, value: any): string => {
     if (key === "dataView") {
       return memo_decode(value);
     }
@@ -124,8 +156,8 @@ const replacer = () => {
 
 let state_key_fn = () => {
   let replacer_fn = replacer();
-  return (...args: any): any => {
-    return JSON.stringify(args, replacer_fn)
+  return (state: any): any => {
+    return JSON.stringify(state, replacer_fn)
   };
 };
 
