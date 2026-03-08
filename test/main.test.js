@@ -407,6 +407,19 @@ testMany('namedSequenceOf', [
     'abc9823-2134-2-24-2--hallo',
   ),
 
+  expectedSuccessTest(
+    namedSequenceOf([
+      ['first', str('abc')],
+      [null, regex(/^[0-9-]+/)],
+      ['third', letters],
+    ]),
+    {
+      first: 'abc',
+      third: 'hallo',
+    },
+    'abc9823-2134-2-24-2--hallo',
+  ),
+
   expectedFailTest(
     namedSequenceOf([
       ['first', str('abc')],

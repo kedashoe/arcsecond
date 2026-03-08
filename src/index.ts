@@ -497,8 +497,8 @@ export function anyOfString(s: string): Parser<string> {
   });
 };
 
-// namedSequenceOf :: [(String, Parser * * *)] -> Parser e (StrMap *) s
-export function namedSequenceOf(pairedParsers: Array<[string, Parser<any>]>): Parser<any[]> {
+// namedSequenceOf :: [(Mabye String, Parser * * *)] -> Parser e (StrMap *) s
+export function namedSequenceOf(pairedParsers: Array<[string | null, Parser<any>]>): Parser<any[]> {
   return new Parser(function namedSequenceOf$state(state) {
     if (state.isError) return state;
 
@@ -511,7 +511,9 @@ export function namedSequenceOf(pairedParsers: Array<[string, Parser<any>]>): Pa
         return out;
       } else {
         nextState = out;
-        results[key] = out.result;
+        if (key != null) {
+          results[key] = out.result;
+        }
       }
     }
 
