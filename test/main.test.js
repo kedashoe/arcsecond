@@ -1205,6 +1205,61 @@ test('coroutine is stack safe', () => {
   expect(parse(parser)(input).result).toEqual('A'.repeat(doubleStack));
 });
 
+const whitespaceSurrounded = (parser) =>
+  between(optionalWhitespace)(optionalWhitespace)(parser);
+
+const betweenParentheses = (parser) =>
+  between(whitespaceSurrounded(char("(")))(
+    whitespaceSurrounded(char(")"))
+  )(parser);
+
+const plus = char("+");
+const minus = char("-");
+const times = char("*");
+const divide = char("/");
+
+// Utilize repetition instead of recursion to define binary expressions
+const binaryExpression = (operator) => (parser) =>
+  sequenceOf([
+    whitespaceSurrounded(parser),
+    many1(
+      sequenceOf([
+        whitespaceSurrounded(operator),
+        whitespaceSurrounded(parser),
+      ])
+    ),
+  ]).map(([initialTerm, expressions]) =>
+    // Flatten the expressions
+    [initialTerm, ...expressions].reduce((acc, curr) =>
+      // Reduce the array into a left-recursive tree
+      Array.isArray(curr) ? [curr[0], acc, curr[1]] : curr
+    )
+  );
+
+// Each precedence group consists of a set of equal precedence terms,
+// followed by a fall-through to the next level of precedence
+const expression = recursiveParser(() =>
+  choice([additionOrSubtraction, term])
+);
+const term = recursiveParser(() =>
+  choice([multiplicationOrDivision, factor])
+);
+const factor = recursiveParser(() =>
+  choice([digits, betweenParentheses(expression)])
+);
+
+// Group operations of the same precedence together
+const additionOrSubtraction = binaryExpression(choice([plus, minus]))(term);
+const multiplicationOrDivision = binaryExpression(choice([times, divide]))(
+  factor
+);
+
+test('parse bomb parses', () => {
+  // https://github.com/francisrstokes/arcsecond/issues/74
+  const result = many(expression).run("9 + (((((((((((5))))))))))) - 4 * 4 / 3")
+  expect(result.isError).toBe(false);
+});
+
 testMany('regression: regex captures the right number of characters', [
   expectedSuccessTest(
     sequenceOf([str('('), regex(/^aeioú/), str(')')]),

@@ -126,7 +126,7 @@ export function fail<E, D>(errorMessage: E) {
 export const succeedWith = Parser.of;
 
 // either :: Parser e a s -> Parser e (Either e a) s
-export function either<T>(parser: Parser<T>): Parser<{isError: boolean, value: T}> {
+export function either<T>(parser: Parser<T>): Parser<{ isError: boolean, value: T }> {
   return new Parser(function either$state(state) {
     if (state.isError) return state;
 
@@ -142,13 +142,13 @@ export function either<T>(parser: Parser<T>): Parser<{isError: boolean, value: T
   });
 };
 
-type ParserFn<T> = (_yield:<K>(parser:Parser<K>)=>K)=>T;
+type ParserFn<T> = (_yield: <K>(parser: Parser<K>) => K) => T;
 
 export function coroutine<T>(parserFn: ParserFn<T>): Parser<T> {
   return new Parser(function coroutine$state(state) {
     let currentValue;
     let currentState = state;
-    
+
     const run = <T>(parser: Parser<T>) => {
       if (!(parser && parser instanceof Parser)) {
         throw new Error(
@@ -167,7 +167,7 @@ export function coroutine<T>(parserFn: ParserFn<T>): Parser<T> {
 
     try {
       const result = parserFn(run);
-      return updateResult(currentState,result);
+      return updateResult(currentState, result);
     } catch (e) {
       if (e instanceof Error) {
         throw e;

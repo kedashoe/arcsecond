@@ -1,4 +1,4 @@
-import { encoder } from './unicode';
+import { decoder, encoder } from './unicode';
 import { InputType, InputTypes, isTypedArray } from './inputTypes';
 
 // createParserState :: x -> s -> ParserState e a s
@@ -86,11 +86,86 @@ export type Ok<T, D> = {
   data: D;
 };
 
+let id_fn = () => {
+  let id = 1;
+  return () => {
+    return id++;
+  };
+};
+
+const MAX_CACHE_SIZE = 128;
+const NOT_FOUND: Object = {};
+
+class RandomEvictionCache<A> {
+  public cache: Map<string, any>;
+  public pointers: Array<string>;
+
+  public constructor() {
+    this.cache = new Map();
+    this.pointers = [];
+  }
+
+  public get(key: string): A | typeof NOT_FOUND {
+    return this.cache.has(key) ? this.cache.get(key) : NOT_FOUND;
+  }
+
+  private maybe_evict() {
+    if (this.pointers.length === MAX_CACHE_SIZE) {
+      const key = this.pointers.splice(Math.floor(Math.random() * MAX_CACHE_SIZE), 1)[0];
+      this.cache.delete(key);
+    }
+  }
+
+  public set(key: string, val: A) {
+    this.maybe_evict();
+    this.cache.set(key, val);
+    this.pointers.push(key);
+  }
+}
+
+let memo = (key_fn: any, fn: any) => {
+  let cache: RandomEvictionCache<any> = new RandomEvictionCache();
+  return (...args: any): any => {
+    const key = key_fn(...args);
+    const maybe_val = cache.get(key);
+    if (maybe_val !== NOT_FOUND) {
+      return maybe_val;
+    }
+    const val = fn(...args);
+    cache.set(key, val);
+    return val;
+  };
+};
+
+const replacer = () => {
+  /*
+   * If we are parsing large inputs, we end up with huge cache keys. But we
+   * don't actually care about the keys themselves, we just need to know if
+   * our value is something we have in the cache. So rather than including
+   * the input in our key, we memoize that as well and store a simple
+   * incrementing id.
+   */
+  const memo_decode = memo(decoder.decode.bind(decoder), id_fn());
+  return (key: string, value: any): string => {
+    if (key === "dataView") {
+      return memo_decode(value);
+    }
+    return value;
+  };
+};
+
+let state_key_fn = () => {
+  let replacer_fn = replacer();
+  return (state: any): any => {
+    return JSON.stringify(state, replacer_fn)
+  };
+};
+
 export class Parser<T, E = string, D = any> {
   p: StateTransformerFunction<T, E, D>;
 
   constructor(p: StateTransformerFunction<T, E, D>) {
-    this.p = p;
+    this.p = memo(state_key_fn(), p);
   }
 
   // run :: Parser e a s ~> x -> Either e a
