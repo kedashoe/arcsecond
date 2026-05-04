@@ -391,22 +391,16 @@ export function regex(re: RegExp): Parser<string> {
     const { dataView, index } = state;
     const rest = getString(index, dataView.byteLength - index, dataView);
 
-    if (rest.length >= 1) {
-      const match = rest.match(re);
-      return match
-        ? updateParserState(state, match[0], index + encoder.encode(match[0]).byteLength)
-        : updateError(
-          state,
-          `ParseError (position ${index}): Expecting string matching '${re}', got '${rest.slice(
-            0,
-            5,
-          )}...'`,
-        );
-    }
-    return updateError(
-      state,
-      `ParseError (position ${index}): Expecting string matching '${re}', but got end of input.`,
-    );
+    const match = rest.match(re);
+    return match
+      ? updateParserState(state, match[0], index + encoder.encode(match[0]).byteLength)
+      : updateError(
+        state,
+        `ParseError (position ${index}): Expecting string matching '${re}', got '${rest.slice(
+          0,
+          5,
+        )}...'`,
+      );
   });
 };
 

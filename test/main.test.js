@@ -370,6 +370,8 @@ testMany('regex', [
     'this is a sentence',
     'this is a sentence. this is another',
   ),
+  expectedSuccessTest(regex(/^a*/), 'a', 'a'),
+  expectedSuccessTest(regex(/^a*/), '', ''),
   expectedFailTest(regex(/^(\w\s?)+/), ''),
   expectedFailTest(regex(/^[a-zA-Z]+/), '123abc'),
   expectedThrowTest(
